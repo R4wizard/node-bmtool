@@ -11,7 +11,7 @@ class List extends Command {
 		super();
 
 		program
-			.command('list [type]')
+			.command('list')
 			.description('retrieves all bookmarks from the list')
 			.option('--regex-uri <regex>', 'regular expression that all URIs must match')
 			.option('--regex-name <regex>', 'regular exprssion that all names must match')
@@ -22,7 +22,6 @@ class List extends Command {
 				console.log('  If no parsers are specified, all parsers will be used.');
 				console.log('  If no profiles are specified, all profiles will be used.');
 				console.log('  If multiple regex parameters are specified, any matches for either will be returned.');
-				console.log('  If a [type] is provided, regex parameters may be overridden.');
 				console.log('');
 				console.log('  Examples:');
 				console.log();
@@ -36,7 +35,7 @@ class List extends Command {
 			});
 	}
 
-	_handleCommand(type, options) {
+	_handleCommand(options) {
 		let regex_uri = options.regexUri;
 		let regex_name = options.regexName;
 

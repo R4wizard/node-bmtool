@@ -1,18 +1,19 @@
 "use strict";
 
 const Colors  = require('colors');
+const FS      = require('fs');
 
 const Command = require('../Command');
 const Core    = require('../Core');
 
-class Random extends Command {
+class ExportJSON extends Command {
 
 	constructor(program) {
 		super();
 
 		program
-			.command('random')
-			.description('select a random bookmark from the list')
+			.command('export-json')
+			.description('retrieves all bookmarks from the list')
 			.option('--regex-uri <regex>', 'regular expression that all URIs must match')
 			.option('--regex-name <regex>', 'regular exprssion that all names must match')
 			.option('--parsers <names>', 'list of parsers to use', e => e.split(','))
@@ -25,12 +26,12 @@ class Random extends Command {
 				console.log('');
 				console.log('  Examples:');
 				console.log();
-				console.log('     $ bmtool random');
-				console.log('     $ bmtool random music');
-				console.log('     $ bmtool random --profiles "Peter Corcoran",Joe');
-				console.log('     $ bmtool random --parsers Chrome,Firefox');
-				console.log('     $ bmtool random --regex-uri "(youtube|soundcloud)\\.co(m|\\.uk)"');
-				console.log('     $ bmtool random --regex-name "(YouTube|Soundcloud)"');
+				console.log('     $ bmtool export-json');
+				console.log('     $ bmtool export-json --file output.json');
+				console.log('     $ bmtool export-json --profiles "Peter Corcoran",Joe');
+				console.log('     $ bmtool export-json --parsers Chrome,Firefox');
+				console.log('     $ bmtool export-json --regex-uri "(youtube|soundcloud)\\.co(m|\\.uk)"');
+				console.log('     $ bmtool export-json --regex-name "(YouTube|Soundcloud)"');
 				console.log();
 			});
 	}
@@ -42,23 +43,22 @@ class Random extends Command {
 		if(regex_uri)  regex_uri = new RegExp(regex_uri, 'i');
 		if(regex_name) regex_name = new RegExp(regex_name, 'i');
 
-		Core.getRandomBookmark({
+		let file = options.file || "output.json";
+
+		Core.getBookmarks({
 			profiles:   options.profiles,
 			parsers:    options.parsers,
 			regex_uri:  regex_uri,
 			regex_name: regex_name
-		}).then(bookmark => {
-			if(!bookmark)
-				return console.error(Colors.red(`> Unable to find a random bookmark with the specified parameters`));
+		}).then(bookmarks => {
+			if(!bookmarks || !bookmarks.length)
+				return console.error(Colors.red(`> Unable to find bookmarks with the specified parameters`));
 
-			console.log(Colors.green(`> ${bookmark.name}`));
-			console.log(`  ${bookmark.uri}`);
-			console.log();
-			console.log(`  Source:      ${bookmark.source}`);
-			console.log(`  Date Added:  ${bookmark.date_added}`);
+			FS.writeFileSync(file, JSON.stringify(bookmarks, null, "\t"));
+			console.log(Colors.green(`> Exported ${bookmarks.length} bookmarks to '${file}'`));
 		});
 	}
 
 }
 
-module.exports = Random;
+module.exports = ExportJSON;

@@ -12,7 +12,8 @@ class CLI {
 		let commands = [
 			require('./Commands/Profiles'),
 			require('./Commands/List'),
-			require('./Commands/Random')
+			require('./Commands/Random'),
+			require('./Commands/ExportJSON')
 		];
 
 		commands.forEach(command => new command(Program));
