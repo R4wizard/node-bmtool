@@ -25,10 +25,15 @@ class Core {
 		return Promise.map(parsers, parser_name => {
 			let parser = this._getParser(parser_name);
 			if(!parser) return Promise.resolve();
-			return (profiles.length == 0 ? parser.getProfiles() : Promise.resolve(profiles)).then(profiles => {
+			return parser.getProfiles().then(parser_profiles => {
+				if(profiles.length == 0)
+					profiles = parser_profiles;
+
+				profiles = profiles.filter(profile => parser_profiles.indexOf(profile) !== -1);
+
 				return Promise.map(profiles, profile_name => parser.getProfile(profile_name).then(profile => {
-					if(!profile) return console.error(Colors.red(`> Profile '${profile_name}' was not found.`));
-					parser.getBookmarks(profile, options).then(marks => {
+					if(!profile) return console.warn(Colors.yellow(`> Profile '${parser_name}/${profile_name}' was not found.`));
+					return parser.getBookmarks(profile, options).then(marks => {
 						bookmarks = bookmarks.concat(marks);
 					});
 				}));
