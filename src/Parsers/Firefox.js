@@ -3,7 +3,9 @@
 const OS      = require('os');
 const FS      = require('fs');
 const Path    = require('path');
+const Glob    = require('glob');
 const Promise = require('bluebird');
+const SQLite3 = require('sqlite3');
 
 const Parser = require('../Parser');
 
@@ -13,100 +15,81 @@ class Firefox extends Parser {
 		super();
 	}
 
-	getBookmarks(path, global_options = {}) {
-		let raw = this._parseFileJSON(Path.join(path, "Bookmarks"));
-		let flat = this._flattenBookmarks(raw);
-
-		let final = [];
-
-		flat.forEach(i => {
-			let matches = [];
-
-			matches.push(global_options.regex_uri && global_options.regex_uri.test(i.url));
-			matches.push(global_options.regex_name && global_options.regex_name.test(i.name));
-
-			matches.push(!global_options.regex_name && !global_options.regex_uri);
-
-			if(matches.indexOf(true) === -1)
-				return false;
-
-			final.push({
-				name: i.name,
-				type: i.type,
-				uri: i.url,
-				source: `Firefox (${profile.name})`,
-				date_added: this._parseChromeTime(i.date_added)
+	_queryMap(db, query, fn) {
+		let promises = [];
+		return new Promise((resolve, reject) => {
+			db.each(query, (err, row) => {
+				if(err) return reject(err);
+				promises.push(fn(row));
+			}, (err, row_count) => {
+				if(err) return reject(err);
+				Promise.all(promises).then(() => resolve(row_count));
 			});
 		});
+	}
 
-		return Promise.resolve(final);
+	getBookmarks(profile, global_options = {}) {
+		let path = Path.join(profile.path, "places.sqlite");
+		let db = new SQLite3.Database(path);
+		let bookmarks = [];
+
+		return new Promise((resolve, reject) => {
+			db.serialize(() => {
+				this._queryMap(db, "SELECT rowid AS id, title, dateAdded, fk FROM moz_bookmarks WHERE type = 1", row => { /* type 1 == bookmark */
+					return this._queryMap(db, "SELECT rowid AS id, url FROM moz_places WHERE rowid = " + row.fk, mark => {
+						let matches = [];
+
+						matches.push(global_options.regex_uri && global_options.regex_uri.test(mark.url));
+						matches.push(global_options.regex_name && global_options.regex_name.test(row.title));
+
+						matches.push(!global_options.regex_name && !global_options.regex_uri);
+
+						if(matches.indexOf(true) === -1)
+							return false;
+
+						bookmarks.push({
+							name: row.title,
+							type: "url",
+							uri: mark.url,
+							source: `Firefox (${profile.name})`,
+							date_added: new Date(row.dateAdded / 1000)
+						});
+					});
+				}).then(() => {
+					db.close();
+					resolve(bookmarks);
+				});
+			});
+		});
 	}
 
 	getProfiles() {
-		return Promise.resolve(Object.keys(this._findProfiles()));
+		return this._findProfiles().then(profiles => {
+			return Object.keys(profiles);
+		});
 	}
 
 	getProfile(profile) {
-		let profiles = this._findProfiles();
-		if(!profiles[profile])
-			return Promise.resolve(false);
-
- 		return Promise.resolve(Promise.profiles[profile]);
-	}
-
-	_parseChromeTime(time) {
-		let past = new Date(1601, 0, 1).getTime();
-		time = parseInt(time, 10);
-		time = time / 1000;
-		return new Date(past + time);
-	}
-
-	_flattenBookmarks(raw) {
-		let marks = [];
-
-		if(typeof raw != 'object')
-			return marks;
-
-		Object.keys(raw).forEach(k => {
-			if(typeof raw[k] != 'object')
-				return;
-
-			if(raw[k].id && raw[k].url) {
-				marks.push(raw[k]);
-			} else {
-				marks = marks.concat(this._flattenBookmarks(raw[k]));
-			}
+		return this._findProfiles().then(profiles => {
+			return profiles[profile] || false;
 		});
-
-		return marks;
 	}
 
 	_findProfiles() {
 		let profiles = {};
 
-		this._findSearchPaths().forEach(path => {
-			let state = this._parseFileJSON(Path.join(path, "Local State"));
-
-			if(state == null || typeof state != 'object')
-				return false;
-
-			if(typeof state.profile != 'object' || typeof state.profile.info_cache != 'object')
-				return false;
-
-			Object.keys(state.profile.info_cache).forEach(k => {
-				let name = state.profile.info_cache[k].shortcut_name;
-				let profile_path = Path.join(path, k);
-				try {
-					FS.accessSync(profile_path, FS.constants.R_OK);
+		return new Promise((resolve, reject) => {
+			this._findSearchPaths().forEach(path => {
+				Glob.sync(Path.join(path, '*')).forEach(profile_path => {
+					let name = profile_path.substr(path.length + 1);
 					profiles[name] = {
 						name: name,
 						path: profile_path
-					};
-				} catch(e) { }
+					};;
+				});
 			});
+			resolve(profiles);
 		});
-
-		return profiles;
 	}
 
 	_findSearchPaths() {

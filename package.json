@@ -1,6 +1,6 @@
 {
   "name": "bmtool",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "index.js",
   "preferGlobal": true,
@@ -14,6 +14,8 @@
   "dependencies": {
     "bluebird": "^3.4.6",
     "colors": "^1.1.2",
-    "commander": "^2.9.0"
+    "commander": "^2.9.0",
+    "glob": "^7.0.6",
+    "sqlite3": "^3.1.4"
   }
 }
